@@ -69,14 +69,45 @@ class JGitShutdownGuardTest {
 
     private static boolean runChildHoldingIndexLock(Path workDir, boolean guarded) throws Exception {
         String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process child = new ProcessBuilder(javaBin, "-cp", System.getProperty("java.class.path"),
-            IndexLockHolder.class.getName(), workDir.toString(), Boolean.toString(guarded))
+        String classpathFile = System.getProperty("test.runtime.classpath.file");
+
+        ProcessBuilder processBuilder;
+        if (classpathFile != null && !classpathFile.isBlank()) {
+            processBuilder = new ProcessBuilder(
+                javaBin,
+                "@" + classpathFile,
+                IndexLockHolder.class.getName(),
+                workDir.toString(),
+                Boolean.toString(guarded)
+            );
+        } else {
+            processBuilder = new ProcessBuilder(
+                javaBin,
+                "-cp",
+                System.getProperty("java.class.path"),
+                IndexLockHolder.class.getName(),
+                workDir.toString(),
+                Boolean.toString(guarded)
+            );
+        }
+
+        Process child = processBuilder
             .redirectErrorStream(true)
             .start();
+
+        boolean finished = child.waitFor(2, TimeUnit.MINUTES);
+        if (!finished) {
+            child.destroyForcibly();
+            child.waitFor();
+        }
+
         String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        assertEquals(0, child.waitFor(2, TimeUnit.MINUTES) ? child.exitValue() : -1, "child JVM failed: " + output);
+        assertTrue(finished, "child JVM timed out; output: " + output);
+        assertEquals(0, child.exitValue(), "child JVM failed: " + output);
+
         return Files.exists(workDir.resolve(Constants.DOT_GIT).resolve("index" + Constants.LOCK_SUFFIX));
     }
+
 
     /** Opens a repository, locks its index and exits without unlocking, exactly like a task caught by a SIGTERM. */
     public static class IndexLockHolder {

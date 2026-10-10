@@ -125,6 +125,21 @@ dependencies {
  **********************************************************************************************************************/
 test {
     finalizedBy jacocoTestReport
+
+    doFirst {
+        temporaryDir.mkdirs()
+        def classpathFile = new File(temporaryDir, 'test-runtime-classpath.txt')
+
+        def escapedClasspath = sourceSets.test.runtimeClasspath.asPath
+            .replace('\\', '\\\\')
+
+        classpathFile.setText(
+            '-cp\n"' + escapedClasspath + '"\n',
+            'UTF-8'
+        )
+
+        systemProperty 'test.runtime.classpath.file', classpathFile.absolutePath
+    }
 }
 
 jacocoTestReport {

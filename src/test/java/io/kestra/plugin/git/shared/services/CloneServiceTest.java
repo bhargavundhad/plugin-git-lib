@@ -2,6 +2,8 @@ package io.kestra.plugin.git.shared.services;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.Git;
 import org.junit.jupiter.api.Test;
@@ -91,6 +93,16 @@ class CloneServiceTest {
         Path workingDir = runContext.workingDir().path();
         Files.writeString(workingDir.resolve("pre-existing.txt"), "I was here first\n");
 
+        Path gitDirectory = workingDir.resolve(".git");
+        Files.createDirectories(gitDirectory);
+
+        Path indexLock = gitDirectory.resolve("index.lock");
+        Files.writeString(indexLock, "stale lock from a previous run");
+        Files.setLastModifiedTime(
+            indexLock,
+            FileTime.fromMillis(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1))
+        );
+
         TestCloningTask gitTask = TestCloningTask.builder().build();
 
         var result = CloneService.clone(runContext, gitTask, CloneService.CloneRequest.builder()
@@ -101,7 +113,11 @@ class CloneServiceTest {
 
         Path repoPath = Path.of(result.directory());
         assertThat(Files.readString(repoPath.resolve("pre-existing.txt")), is("I was here first\n"));
-        assertThat(Files.readString(repoPath.resolve("repo-file.txt")), is("from repo\n"));
+        assertThat(
+            Files.readString(repoPath.resolve("repo-file.txt")).replace("\r\n", "\n"),
+            is("from repo\n")
+        );
+        assertThat(Files.exists(indexLock), is(false));
     }
 
     @Test
