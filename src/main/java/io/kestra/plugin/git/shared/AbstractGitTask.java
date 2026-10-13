@@ -43,6 +43,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.git.shared.services.JGitCleanupIsolation;
 import io.kestra.plugin.git.shared.services.SshTransportConfigCallback;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -71,6 +72,13 @@ public abstract class AbstractGitTask extends Task {
     // Namespace-first Git layout used by every namespace/tenant sync task: <namespace>/flows, <namespace>/files.
     private static final String FLOWS_DIR = "flows";
     private static final String FILES_DIR = "files";
+
+    static {
+        // Runs when the first task class initializes — every task base extends AbstractGitTask, so this precedes
+        // this library's first JGit operation without needing static blocks in the service classes; see
+        // JGitCleanupIsolation for scope, collateral effects and the failure policy.
+        JGitCleanupIsolation.isolateSafely();
+    }
 
     /**
      * Whether a namespace known only in Git carries content for a kind whose resolved source is GIT, narrowed

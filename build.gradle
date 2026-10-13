@@ -50,6 +50,10 @@ dependencies {
 
     // git — exposed as api so consumers (plugin-git, plugin-ee-git) inherit them transitively
     // kept in lockstep with plugin-ee-git's jgit version to avoid silently downgrading it
+    // MAINTENANCE: JGitCleanupIsolation reaches into the internal org.eclipse.jgit.internal.util.CleanupService
+    // to suppress JGit's JVM shutdown hook (issue #23). That internal API has no compatibility contract, so on any
+    // JGit bump re-run JGitShutdownRaceTest — it is the canary for both the mechanism (hook still suppressible)
+    // and each failure mode (checkout index lock, fetch/partial-clone cleanup) — before releasing.
     api 'org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r'
     api 'org.eclipse.jgit:org.eclipse.jgit.ssh.jsch:7.8.0.202609011348-r'
     api "org.eclipse.jgit:org.eclipse.jgit.http.apache:7.8.0.202609011348-r"
@@ -65,6 +69,18 @@ dependencies {
  **********************************************************************************************************************/
 test {
     useJUnitPlatform()
+
+    // JGitShutdownRaceTest forks a child JVM; on Windows the test runtime classpath can exceed the
+    // CreateProcess command-line limit, so the child is launched from a java @argfile carrying this
+    // ready-to-use "-cp" fragment. Written on every test run and read verbatim by the test — the token is
+    // escaped exactly once, here; re-escaping it in test code breaks the child's classpath.
+    doFirst {
+        def argFile = layout.buildDirectory.file('test-argfiles/test-runtime-classpath.argfile').get().asFile
+        argFile.parentFile.mkdirs()
+        def classpath = sourceSets.test.runtimeClasspath.files.join(File.pathSeparator)
+        argFile.text = '-cp "' + classpath.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    }
+    systemProperty 'io.kestra.git.test.classpathArgfile', layout.buildDirectory.file('test-argfiles/test-runtime-classpath.argfile').get().asFile.absolutePath
 }
 
 dependencies {

@@ -101,7 +101,10 @@ class CloneServiceTest {
 
         Path repoPath = Path.of(result.directory());
         assertThat(Files.readString(repoPath.resolve("pre-existing.txt")), is("I was here first\n"));
-        assertThat(Files.readString(repoPath.resolve("repo-file.txt")), is("from repo\n"));
+        assertThat(
+            Files.readString(repoPath.resolve("repo-file.txt")).replace("\r\n", "\n"),
+            is("from repo\n")
+        );
     }
 
     @Test
