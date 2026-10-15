@@ -62,7 +62,6 @@ public final class JGitShutdownRaceChild {
                 e.printStackTrace(System.out);
             } finally {
                 written.set(true);
-                suspended.countDown(); // also unblocks main if the clone failed before reaching the phase
             }
         }).start();
 

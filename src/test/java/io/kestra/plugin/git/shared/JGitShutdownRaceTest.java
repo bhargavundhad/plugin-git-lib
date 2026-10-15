@@ -59,7 +59,7 @@ class JGitShutdownRaceTest {
             remote.toUri().toString(), tempDir().toString(), resultFile.toString(), trigger, guard)
             .redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if (!child.waitFor(120, TimeUnit.SECONDS)) {
-            child.destroyForcibly();
+            child.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
         }
 
         Map<String, String> result = new HashMap<>();
